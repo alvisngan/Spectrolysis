@@ -1,0 +1,14 @@
+/build/*
+!/build/.gitkeep
+
+# cache and editor
+.cache/
+.vscode/
+
+# audio files
+*.wav
+*.WAV
+*.flac
+*.FLAC
+*.mp3
+*.MP3

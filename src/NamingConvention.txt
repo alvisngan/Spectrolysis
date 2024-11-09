@@ -1,0 +1,13 @@
+len -> number of elements in an array
+size -> byte size of an array
+
+get -> get variable from class, or static variables
+
+TODO:
+    fill -> fill an array with data (not used :p)
+
+    unit in variable and function names
+
+    loop:
+        columns j
+        row i
