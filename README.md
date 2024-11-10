@@ -2,9 +2,19 @@
 ### Real Time 3D Spectrogram and Spectrum Analysis 
 
 For visualizing real time audio spectrogram, supports microphone input and
-audio playback (mp3 flac wav).
+audio playback.
 
 ![preview](./Screenshot.png)
+
+## Features
+![demo](./demo.gif)
+- GPU based real-time 3D spectrogram rendering with OpenGL
+- Complementary frequency plot with selectable log or linear scale x-axis
+- Built in microphone recoder and audio player
+- MP3, FLAC, and WAV support
+- 3D spectrogram with user controllable rotation, panning, and zoom
+- Convolution based smoothing for smoother animation
+- Uniform spectrogram colormap with OKLAB colorspace
 
 ## Building from Source
 ### Required Packages
@@ -40,4 +50,3 @@ This project is made with the following:
 - tinyfiledialogs 
 - dr_libs
 - Catppuccin (UI theme)
-
