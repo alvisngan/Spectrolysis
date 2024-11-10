@@ -25,7 +25,6 @@
 ///
 /// \return         done using the window
 ///
-// bool processInput(SDL_Window* window);
 bool processInput(SDL_Window* window, Camera& camera);
 
 
@@ -42,10 +41,6 @@ void checkRenderErrors(const char* errorLocation = "");
 const int g_SCR_WIDTH = 1920;
 const int g_SCR_HEIGHT = 1080;
 guiColorPalette g_color; // used in gui_theme.cpp
-
-// Initiate camera object at global for processInput
-// BUG: audioplayer only works when camera initiated at global
-// Camera g_camera;
 
 
 // FFT len
@@ -213,7 +208,6 @@ int main()
         // draw 
         rectShader.use();
         rectShader.setMat4("rotationMat", camera.getPVMMat());
-        // rectShader.setMat4("rotationMat", g_camera.getPVMMat());
 
 
         // audioInterface
@@ -324,7 +318,6 @@ int main()
         inputs.freqPlotY = &magnitudeBuffer[1];
         inputs.viewportTextureID = sceneBuffer.getFrameTexture();
         inputs.cameraPtr = &camera;
-        // inputs.cameraPtr = &g_camera;
         inputs.audioPlayerPtr = &audioPlayer;
         inputs.micPtr = &mic;
         inputs.gridPtr = &xy;
@@ -347,77 +340,6 @@ int main()
     return 0;
 }
 
-
-// bool processInput(SDL_Window* window)
-// {
-//     bool done = false;
-
-//     // event handling
-//     // --------------
-//     SDL_Event event;
-//     while (SDL_PollEvent(&event))
-//     {
-//         // bind ImGui io to SDL
-//         // --------------------
-//         ImGui_ImplSDL2_ProcessEvent(&event);
-
-//         // handle quit
-//         // -----------
-//         if (event.type == SDL_QUIT)
-//         {
-//             done = true;
-//         }
-//         else if (event.type == SDL_WINDOWEVENT 
-//             && event.window.event == SDL_WINDOWEVENT_CLOSE 
-//             && event.window.windowID == SDL_GetWindowID(window)
-//         )
-//         {
-//             done = true;
-//         }
-//         else
-//         {
-//             done = false;
-//         }
-
-//         // handle SDL mouse wheel event
-//         // ----------------------------
-//         if (event.type == SDL_MOUSEWHEEL)
-//         {
-//             // get the hovered state from ImGui
-//             if (guiViewportGetHovered())
-//             {
-//                 g_camera.scroll2Zoom(static_cast<double>(event.wheel.y));
-//             }
-//         }
-//         else
-//         {
-//             g_camera.isNotScrolling();
-//         }
-//     }
-
-//     // drag and rotate
-//     // ---------------
-//     bool clicking = (
-//         guiViewportGetHovered() 
-//         && ImGui::IsMouseDown(ImGuiMouseButton_Left)
-//     );
-//     double x, y;
-//     x = ImGui::GetMousePos().x;
-//     y = ImGui::GetMousePos().y;
-//     g_camera.drag2Rotate(x, y, clicking);
-
-//     // right drag and rotate
-//     // ---------------
-//     bool rightClicking = (
-//         guiViewportGetHovered() 
-//         && ImGui::IsMouseDown(ImGuiMouseButton_Right)
-//     );
-//     g_camera.rightDrag2Move(x, y, rightClicking);
-
-//     // return window state
-//     // -------------------
-//     return done;
-// }
 
 bool processInput(SDL_Window* window, Camera& camera)
 {
