@@ -253,7 +253,7 @@ void array2dGridBatched(float* gridArray,
         // ----------
         int uStartIdx = nRowsV * nColsV * 2;
 
-        #pragma omp parallel for
+        // #pragma omp parallel for
         for (int j = 0; j < nColsV; ++j)
         {
             gridArray[j + uStartIdx] = (
