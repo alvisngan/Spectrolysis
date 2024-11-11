@@ -3,6 +3,10 @@
 #include <array>
 #include <vector>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
 #include "imgui.h"
@@ -21,6 +25,52 @@
 #include "smoothing.hpp"
 
 
+/// Passing the input references to the mainloop, a lot of members because
+/// we don't want to initializen objects and arrays every single frame
+///
+/// TODO: some of the buffers could be aliased
+///
+/// TODO: parameter documentations
+///
+typedef struct {
+    // grid information
+    int nRowsV;
+    int nColsV;
+    float* z;
+
+    // objects
+    SDL_Window* window;
+    Grid* gridPtr;
+    Shader* spectroShaderPtr;
+    Camera* cameraPtr;
+    FrameBuffer* sceneBufferPtr;
+    AudioPlayer* audioPlayerPtr;
+    Microphone* micPtr;
+
+    // FFT
+    float* complexBuffer;           // len = g_FFT_LEN
+    float* signalBuffer;            // len = g_FFT_LEN
+    float* workBuffer;              // len = g_FFT_LEN
+    float* magnitudeBuffer;         // len = g_FFT_LEN / 2
+    float* freqArray;               // len = g_FFT_LEN / 2
+
+    // bluring rows
+    int nConvRows;
+    float* colKernel;               // len = nConvRows
+    float* previousRows;            // len = (nConvRows - 1) * g_FFT_LEN/2
+    float* workRow;                 // len = g_FFT_LEN / 2
+    float* workFFTRow;              // len = g_FFT_LEN / 2
+    float* workConvRow;             // len = g_FFT_LEN / 2
+
+} MainloopInputs;
+
+
+/// TODO:   emscripten main loop requires void* argument parameter
+/// \param window   SDL2 window
+///
+void mainloop(MainloopInputs inputs);
+
+
 /// \param window   SDL2 window
 ///
 /// \return         done using the window
@@ -36,6 +86,7 @@ bool processInput(SDL_Window* window, Camera& camera);
 ///
 void checkRenderErrors(const char* errorLocation = "");
 
+bool g_done = false;
 
 // settings
 const int g_SCR_WIDTH = 1920;
@@ -116,7 +167,7 @@ int main()
 
     // build and compile our shader program
     // ------------------------------------
-    Shader rectShader("../src/shader_programs/rect.vs",
+    Shader spectroShader("../src/shader_programs/rect.vs",
                       "../src/shader_programs/rect.fs");
 
     // z-coordinates vector
@@ -146,10 +197,6 @@ int main()
     AudioPlayer audioPlayer;
     Microphone mic;
 
-    // if it is paused in its repective audio interface mode
-    bool audioInterfaceIsPaused; 
-    bool audioInterfacePlayerMode;
-
     // FFT and smoothing
     // -----------------
     fftInit(g_FFT_LEN);
@@ -173,7 +220,7 @@ int main()
 
     memset(&previousRows[0], 0, ((nConvRows - 1) * g_FFT_LEN/2) * sizeof(float));
 
-    // Open GL settings
+    // OpenGL settings
     //-----------------
     // // poly mode, for debug
     // glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
@@ -187,147 +234,50 @@ int main()
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
+    // passing inputs into the MainloopInputs struct
+    // ---------------------------------------------
+    MainloopInputs inputs;
+
+    inputs.nRowsV = nRowsV;
+    inputs.nColsV = nColsV;
+
+    inputs.z = z.data();
+
+    inputs.window = window;
+    inputs.gridPtr = &xy;
+    inputs.spectroShaderPtr = &spectroShader;
+    inputs.cameraPtr = &camera;
+    inputs.sceneBufferPtr = &sceneBuffer;
+    inputs.audioPlayerPtr = &audioPlayer;
+    inputs.micPtr = &mic;
+
+    // FFT
+    inputs.complexBuffer = &complexBuffer[0];          
+    inputs.signalBuffer = &signalBuffer[0];
+    inputs.workBuffer = &workBuffer[0];
+    inputs.magnitudeBuffer = &magnitudeBuffer[0]; 
+    inputs.freqArray = &freqArray[0];
+
+    // bluring rows
+    inputs.nConvRows = nConvRows;
+    inputs.colKernel = &colKernel[0];    
+    inputs.previousRows = &previousRows[0];    
+    inputs.workRow = &workRow[0];
+    inputs.workFFTRow = &workFFTRow[0];        
+    inputs.workConvRow = &workConvRow[0];  
+
+
     // render loop
     // -----------
-    bool done = false;
-    while (!done)
+#ifdef __EMSCRIPTEN__ 
+    ImGui::GetIO().IniFilename = nullptr; // disable IniFilename for emscripten
+    emscripten_set_main_loop(main_loop, 0, true);
+#else
+    while (!g_done)
     {
-        // input
-        // -----
-        // done = processInput(window);
-        done = processInput(window, camera);
-
-        // render viewport to frame buffer texture
-        // ---------------------------------------
-        sceneBuffer.bind();
-
-        // background for viewport only
-        glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // draw 
-        rectShader.use();
-        rectShader.setMat4("rotationMat", camera.getPVMMat());
-
-
-        // audioInterface
-        // --------------
-        audioInterfacePlayerMode = guiAudioInterfaceGetPlayerMode();
-
-        if (audioInterfacePlayerMode)
-        {
-            if (!audioPlayer.getIsPaused())
-            {
-                audioPlayer.getAudioData(&signalBuffer[0], 
-                                         g_AUDIO_BUFFER_LEN);
-
-                fftFrequency(&freqArray[0], 
-                             audioPlayer.getFreq(), 
-                             g_FFT_LEN / 2);
-                             
-                audioInterfaceIsPaused = false;
-            }
-            else
-            {
-                audioInterfaceIsPaused = true;
-            }
-        }
-        else
-        {
-            if (!mic.getIsPaused())
-            {
-                mic.getAudioData(&signalBuffer[0], 
-                                 g_AUDIO_BUFFER_LEN);
-
-                fftFrequency(&freqArray[0], 
-                             mic.getFreq(), 
-                             g_FFT_LEN / 2);
-
-                audioInterfaceIsPaused = false;
-            }
-            else
-            {
-                audioInterfaceIsPaused = true;
-            }
-        }
-
-        if (!audioInterfaceIsPaused)
-        {
-            // update the spectrogram
-            // ----------------------
-            // perfrom FFT
-            memset(&signalBuffer[g_AUDIO_BUFFER_LEN], 
-                   0, 
-                   (g_FFT_LEN - g_AUDIO_BUFFER_LEN) * sizeof(float));
-
-            fftForwardFFT(&signalBuffer[0], 
-                          &complexBuffer[0], 
-                          &workBuffer[0]);
-
-            fftComplexToRealDB(&magnitudeBuffer[0], 
-                               &complexBuffer[0], 
-                               g_FFT_LEN / 2, 
-                               true);
-
-            // spectrogram stuff
-            array2dMoveRowsUp(&z[0], nRowsV, nColsV, 1);
-
-            smoothingBlurRow(&magnitudeBuffer[1],
-                             &magnitudeBuffer[1],
-                             &previousRows[0],
-                             &workRow[0],
-                             &workFFTRow[0],
-                             &workConvRow[0],
-                             &colKernel[0],
-                             g_FFT_LEN,
-                             nConvRows);
-
-            //  omit DC and the freq before Nyquist
-            memcpy(&z[array2dIdx(nRowsV - 1, 0, nColsV)], 
-                   &magnitudeBuffer[1], 
-                   (g_FFT_LEN / 2 - 2) * sizeof(float));
-
-            // modify z array on GPU
-            xy.zSubAllData(z.data());  
-        }
-        else
-        {
-            // nothing, the buffer will stay the same hence achieving pause
-        }
-
-        // draw and unbind viewport
-        // ------------------------
-        xy.draw();
-        sceneBuffer.unbind();
-        
-        //--------------
-        // window render
-        // -------------
-        // background color
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // gui render
-        // ----------
-        guiNewFrame();
-
-        guiInputs inputs;
-
-        inputs.freqPlotLen = g_FFT_LEN / 2 - 2;
-        inputs.freqPlotX = &freqArray[1];
-        inputs.freqPlotY = &magnitudeBuffer[1];
-        inputs.viewportTextureID = sceneBuffer.getFrameTexture();
-        inputs.cameraPtr = &camera;
-        inputs.audioPlayerPtr = &audioPlayer;
-        inputs.micPtr = &mic;
-        inputs.gridPtr = &xy;
-
-        guiApp(inputs);
-
-        guiRender();
-
-        SDL_GL_SwapWindow(window);
+        mainloop(inputs);
     }
+#endif
 
     // clean up
     // --------
@@ -338,6 +288,150 @@ int main()
     SDL_Quit();
     
     return 0;
+}
+
+
+void mainloop(MainloopInputs inputs)
+{
+    // input
+    // -----
+    g_done = processInput(inputs.window, *inputs.cameraPtr);
+
+    // render viewport to frame buffer texture
+    // ---------------------------------------
+    inputs.sceneBufferPtr->bind();
+
+    // background for viewport only
+    glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // draw 
+    inputs.spectroShaderPtr->use();
+    inputs.spectroShaderPtr->setMat4("rotationMat", 
+                                     inputs.cameraPtr->getPVMMat());
+
+
+    // audioInterface
+    // --------------
+    // if it is paused in its repective audio interface mode
+    bool audioInterfaceIsPaused; 
+    bool audioInterfacePlayerMode;
+
+    audioInterfacePlayerMode = guiAudioInterfaceGetPlayerMode();
+
+    if (audioInterfacePlayerMode)
+    {
+        if (!inputs.audioPlayerPtr->getIsPaused())
+        {
+            inputs.audioPlayerPtr->getAudioData(&inputs.signalBuffer[0], 
+                                                g_AUDIO_BUFFER_LEN);
+
+            fftFrequency(inputs.freqArray, 
+                         inputs.audioPlayerPtr->getFreq(), 
+                         g_FFT_LEN / 2);
+                            
+            audioInterfaceIsPaused = false;
+        }
+        else
+        {
+            audioInterfaceIsPaused = true;
+        }
+    }
+    else
+    {
+        if (!inputs.micPtr->getIsPaused())
+        {
+            inputs.micPtr->getAudioData(inputs.signalBuffer, 
+                                        g_AUDIO_BUFFER_LEN);
+
+            fftFrequency(inputs.freqArray, 
+                         inputs.micPtr->getFreq(), 
+                         g_FFT_LEN / 2);
+
+            audioInterfaceIsPaused = false;
+        }
+        else
+        {
+            audioInterfaceIsPaused = true;
+        }
+    }
+
+    if (!audioInterfaceIsPaused)
+    {
+        // update the spectrogram
+        // ----------------------
+        // perfrom FFT
+        memset(&inputs.signalBuffer[g_AUDIO_BUFFER_LEN], 
+                0, 
+                (g_FFT_LEN - g_AUDIO_BUFFER_LEN) * sizeof(float));
+
+        fftForwardFFT(inputs.signalBuffer, 
+                      inputs.complexBuffer, 
+                      inputs.workBuffer);
+
+        fftComplexToRealDB(inputs.magnitudeBuffer, 
+                            inputs.complexBuffer, 
+                            g_FFT_LEN / 2, 
+                            true);
+
+        // spectrogram stuff
+        array2dMoveRowsUp(inputs.z, inputs.nRowsV, inputs.nColsV, 1);
+
+        smoothingBlurRow(&inputs.magnitudeBuffer[1],
+                         &inputs.magnitudeBuffer[1],
+                            inputs.previousRows,
+                            inputs.workRow,
+                            inputs.workFFTRow,
+                            inputs.workConvRow,
+                            inputs.colKernel,
+                            g_FFT_LEN,
+                            inputs.nConvRows);
+
+        //  omit DC and the freq before Nyquist
+        memcpy(&inputs.z[array2dIdx(inputs.nRowsV - 1, 0, inputs.nColsV)], 
+                &inputs.magnitudeBuffer[1], 
+                (g_FFT_LEN / 2 - 2) * sizeof(float));
+
+        // modify z array on GPU
+        inputs.gridPtr->zSubAllData(inputs.z);  
+    }
+    else
+    {
+        // nothing, the buffer will stay the same hence achieving pause
+    }
+
+    // draw and unbind viewport
+    // ------------------------
+    inputs.gridPtr->draw();
+    inputs.sceneBufferPtr->unbind();
+    
+    //--------------
+    // window render
+    // -------------
+    // background color
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // gui render
+    // ----------
+    guiNewFrame();
+
+    GuiInputs guiInputs;
+
+    guiInputs.freqPlotLen = g_FFT_LEN / 2 - 2;
+    guiInputs.freqPlotX = &inputs.freqArray[1];
+    guiInputs.freqPlotY = &inputs.magnitudeBuffer[1];
+    guiInputs.viewportTextureID = inputs.sceneBufferPtr->getFrameTexture();
+    guiInputs.cameraPtr = inputs.cameraPtr;
+    guiInputs.audioPlayerPtr = inputs.audioPlayerPtr;
+    guiInputs.micPtr = inputs.micPtr;
+    guiInputs.gridPtr = inputs.gridPtr;
+
+    guiApp(guiInputs);
+
+    guiRender();
+
+    SDL_GL_SwapWindow(inputs.window);
 }
 
 
