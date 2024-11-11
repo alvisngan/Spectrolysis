@@ -24,7 +24,7 @@ typedef struct {
     AudioPlayer* audioPlayerPtr;
     Microphone* micPtr;
     Grid* gridPtr;
-} guiInputs;
+} GuiInputs;
 
 /// \param version GLSL version
 void guiInit(SDL_Window *window, 
@@ -33,7 +33,7 @@ void guiInit(SDL_Window *window,
 
 void guiNewFrame();
 
-void guiApp(guiInputs& inputs);
+void guiApp(GuiInputs& inputs);
 
 void guiRender();
 

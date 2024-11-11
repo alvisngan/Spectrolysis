@@ -19,7 +19,7 @@ static void s_setUpFonts();
 
 // main menu
 // ---------
-void s_guiMainMenu(ImGuiDockNodeFlags& dockspace_flags, guiInputs& inputs);
+void s_guiMainMenu(ImGuiDockNodeFlags& dockspace_flags, GuiInputs& inputs);
 static void s_guiDockingOptMenu(ImGuiDockNodeFlags& dockspace_flags);
 
 static void s_guiViewMenu();
@@ -93,7 +93,7 @@ void guiRender()
 }
 
 // also includes main menu
-void guiApp(guiInputs& inputs)
+void guiApp(GuiInputs& inputs)
 {
     // adopted from imgui_demo.cpp ShowExampleAppDockSpace
     // ---------------------------------------------------
@@ -209,7 +209,7 @@ void guiApp(guiInputs& inputs)
 }
 
 
-void s_guiMainMenu(ImGuiDockNodeFlags& dockspace_flags, guiInputs& inputs)
+void s_guiMainMenu(ImGuiDockNodeFlags& dockspace_flags, GuiInputs& inputs)
 {
     if (ImGui::BeginMenuBar())
     {
