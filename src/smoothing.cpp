@@ -102,7 +102,7 @@ void smoothingInsertRow(float* smoothingRow,     // fftLen/2 - 2
     // finding the sum of each column elements will result
     // in effectively 2D convolution without doing more costly FFT
     // (sum because comlumn kernel has value [1; 0; 1])
-    #pragma omp simd
+    // #pragma omp simd
     for (unsigned int i = 0; i < fftLen/2; ++i)
     {
         workSmoothing[i] = (work1[i] + work0[i]);
@@ -197,7 +197,7 @@ void smoothingBlurRow(const float* row,
     // use a random useless work row to store the fully convolved data
     memset(&workFFTRow[0], 0, (fftLen/2) * sizeof(float));
 
-    #pragma omp simd // auto SIMD maybe?
+    // #pragma omp simd // auto SIMD maybe?
     for (int j = 0; j < fftLen/2; ++j)
     {
         // previous rows
