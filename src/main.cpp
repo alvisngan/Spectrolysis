@@ -2,6 +2,7 @@
 #include <cstring>
 #include <array>
 #include <vector>
+#include <memory>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -65,10 +66,15 @@ typedef struct {
 } MainloopInputs;
 
 
-/// TODO:   emscripten main loop requires void* argument parameter
-/// \param window   SDL2 window
-///
 void mainloop(MainloopInputs inputs);
+
+
+void mainloopWrapper(void* arg)
+{
+    MainloopInputs* inputs = (MainloopInputs*)arg;
+
+    mainloop(*inputs);
+}
 
 
 /// \param window   SDL2 window
@@ -112,11 +118,10 @@ int main()
         return -1;
     }
 
-    // const char* glsl_version = "#version 100";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 
     // Create window with graphics context
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
@@ -200,7 +205,31 @@ int main()
     // FFT and smoothing
     // -----------------
     fftInit(g_FFT_LEN);
+
+    // number of rows for the bluring kernel
+    constexpr int nConvRows = 10; // 10 seems good for freqPlot
+    
     // buffers has to be aligned memory
+#ifdef __EMSCRIPTEN__ 
+    // .wasm is very stingy when it comes to stack memory
+    // allocate aligned memory to the heap
+    // free after the mainloop (mainloopInputs will borrow these pointers!)
+    float* complexBuffer = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN * sizeof(float)));
+    float* signalBuffer = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN * sizeof(float)));
+    float* workBuffer = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN * sizeof(float)));
+    float* magnitudeBuffer = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN/2 * sizeof(float)));
+    float* freqArray = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN/2 * sizeof(float)));
+
+    // bluring
+    std::vector<float> colKernel(nConvRows);
+
+    // work buffers for bluring rows
+    float* previousRows = static_cast<float*>(std::aligned_alloc(64, (nConvRows - 1) * g_FFT_LEN/2 * sizeof(float)));
+    float* workRow = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN/2 * sizeof(float)));
+    float* workFFTRow = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN/2 * sizeof(float)));
+    float* workConvRow = static_cast<float*>(std::aligned_alloc(64, g_FFT_LEN/2 * sizeof(float)));
+#else
+    // statically allocate aligned memory
     alignas(64) float complexBuffer[g_FFT_LEN];
     alignas(64) float signalBuffer[g_FFT_LEN];
     alignas(64) float workBuffer[g_FFT_LEN];
@@ -208,16 +237,17 @@ int main()
     std::array<float, g_FFT_LEN / 2> freqArray{};
 
     // blurring
-    constexpr int nConvRows = 10; // 10 seems good for freqPlot
     float colKernel[nConvRows];
-    smoothingHalfGaussian(&colKernel[0], nConvRows);
 
-    // work buffer for blurring rows
+    // work buffers for blurring rows
     alignas(64) float previousRows[(nConvRows - 1) * g_FFT_LEN/2];
     alignas(64) float workRow[g_FFT_LEN/2];
     alignas(64) float workFFTRow[g_FFT_LEN/2];
     alignas(64) float workConvRow[g_FFT_LEN/2];
+#endif
 
+    // bluring: create kernel and set previousRows to zero's
+    smoothingHalfGaussian(&colKernel[0], nConvRows);
     memset(&previousRows[0], 0, ((nConvRows - 1) * g_FFT_LEN/2) * sizeof(float));
 
     // OpenGL settings
@@ -271,7 +301,7 @@ int main()
     // -----------
 #ifdef __EMSCRIPTEN__ 
     ImGui::GetIO().IniFilename = nullptr; // disable IniFilename for emscripten
-    emscripten_set_main_loop(main_loop, 0, true);
+    emscripten_set_main_loop_arg(mainloopWrapper, &inputs, 0, true);
 #else
     while (!g_done)
     {
@@ -286,6 +316,19 @@ int main()
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+#ifdef __EMSCRIPTEN__ 
+    std::free(complexBuffer);
+    std::free(signalBuffer);
+    std::free(workBuffer);
+    std::free(magnitudeBuffer);
+    std::free(freqArray);
+
+    std::free(previousRows);
+    std::free(workRow);
+    std::free(workFFTRow);
+    std::free(workConvRow);
+#endif
     
     return 0;
 }
