@@ -17,15 +17,24 @@
 
 #include <string>
   
+typedef enum {
+    SHADER_SOURCE_PATH,     /// shaders are specified by external paths
+    SHADER_SOURCE_CSTR      /// shaders are specified by a c-string
+} shaderSource;
+
 
 class Shader
 {
 public:
+
     // the program ID
     unsigned int ID;
   
     // constructor reads and builds the shader
-    Shader(const char* vertexPath, const char* fragmentPath);
+    Shader(const char* vertexShader, 
+           const char* fragmentShader,
+           shaderSource sourceType);
+
     ~Shader();
 
     // use/activate the shader
@@ -41,6 +50,7 @@ public:
 
 private:
     void checkCompileErrors(unsigned int shader, std::string type);
+    void compileShaders(const char* vShaderCode, const char* fShaderCode);
 };
   
 #endif

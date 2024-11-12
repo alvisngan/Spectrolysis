@@ -25,6 +25,10 @@
 #include "fft.hpp"
 #include "smoothing.hpp"
 
+#ifdef __EMSCRIPTEN__
+#include "shader_programs/shader_programs.h" 
+#endif
+
 
 /// Passing the input references to the mainloop, a lot of members because
 /// we don't want to initializen objects and arrays every single frame
@@ -152,7 +156,7 @@ int main()
         return -1;
     }
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1); // enable V-Sync
+    // SDL_GL_SetSwapInterval(1); // enable V-Sync
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -172,8 +176,17 @@ int main()
 
     // build and compile our shader program
     // ------------------------------------
+#ifdef __EMSCRIPTEN__ 
+    // use c-string shaders to aviod preloading mess
+    Shader spectroShader(vertexShader,
+                         fragmentShader,
+                         SHADER_SOURCE_CSTR);
+#else 
+    // use shader files for easier changes
     Shader spectroShader("../src/shader_programs/rect.vs",
-                      "../src/shader_programs/rect.fs");
+                         "../src/shader_programs/rect.fs",
+                         SHADER_SOURCE_PATH);
+#endif
 
     // z-coordinates vector
     // --------------------
@@ -302,7 +315,10 @@ int main()
 #ifdef __EMSCRIPTEN__ 
     ImGui::GetIO().IniFilename = nullptr; // disable IniFilename for emscripten
     emscripten_set_main_loop_arg(mainloopWrapper, &inputs, 0, true);
+    SDL_GL_SetSwapInterval(1); // enable V-Sync
+
 #else
+    SDL_GL_SetSwapInterval(1); // enable V-Sync
     while (!g_done)
     {
         mainloop(inputs);
