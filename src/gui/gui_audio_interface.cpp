@@ -140,6 +140,7 @@ void s_guiAudioPlayer(AudioPlayer& audioPlayer)
         // option 1: "System Default"
         if (ImGui::Selectable("System Default", s_audioPlayerSelectedDevice == nullptr))
         {
+            audioPlayer.pause();
             s_audioPlayerSelectedDevice = nullptr;
             audioPlayer.setupDevice(s_audioPlayerSelectedDevice);
         }
@@ -151,6 +152,7 @@ void s_guiAudioPlayer(AudioPlayer& audioPlayer)
             bool isSelected = (s_audioPlayerSelectedDevice == s_audioPlayerDevices[i].c_str());
             if (ImGui::Selectable(s_audioPlayerDevices[i].c_str(), isSelected))
             {
+                audioPlayer.pause();
                 s_audioPlayerSelectedDevice = s_audioPlayerDevices[i].c_str(); 
                 audioPlayer.setupDevice(s_audioPlayerSelectedDevice);
             }
