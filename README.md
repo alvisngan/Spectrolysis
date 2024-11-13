@@ -38,6 +38,12 @@ $ cd build
 $ ./main
 ```
 
+### Webassembly
+```
+emcmake cmake -S . -B build_emscripten
+cmake --build build_emscripten
+```
+
 
 ## Dependencies
 This project is made with the following:
