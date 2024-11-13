@@ -197,6 +197,7 @@ void AudioPlayer::flacToFloat(const char* filepath)
 
     // we need the data later, no freeing pSampleData
     pSampleData = nullptr;
+    
 }
 
 
@@ -392,9 +393,10 @@ void AudioPlayer::setupDevice(const char* deviceName)
 
     // set the device for playback for 0, or '1' for recording.
     device = SDL_OpenAudioDevice(
-        deviceName, 0, &audioSpec, nullptr, SDL_AUDIO_ALLOW_ANY_CHANGE
-    );
-    
+        deviceName, 0, &audioSpec, nullptr, 
+        // disallow frequency change
+        SDL_AUDIO_ALLOW_FORMAT_CHANGE | SDL_AUDIO_ALLOW_CHANNELS_CHANGE
+    );  
 
     if (device == 0)
     {
