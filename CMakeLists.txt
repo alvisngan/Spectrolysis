@@ -11,28 +11,36 @@ endif()
 
 # Find required packages
 if(USING_EMSCRIPTEN)
-add_compile_options(
-  "-sUSE_SDL=2"
-  "-sUSE_WEBGL2=1"
-  "-sMAX_WEBGL_VERSION=2"
-  "-sMIN_WEBGL_VERSION=2"
-  "-sFULL_ES3=1"
-  "-sALLOW_MEMORY_GROWTH=1"
-  "-sASSERTIONS=1"
-)
-add_link_options(
-  "-sUSE_SDL=2"
-  "-sUSE_WEBGL2=1"
-  "-sMAX_WEBGL_VERSION=2"
-  "-sMIN_WEBGL_VERSION=2"
-  "-sFULL_ES3=1"
-  "-sALLOW_MEMORY_GROWTH=1"
-  "-sASSERTIONS=1"
-)
+  add_compile_options(
+    "-sUSE_SDL=2"
+    "-sUSE_WEBGL2=1"
+    "-sMAX_WEBGL_VERSION=2"
+    "-sMIN_WEBGL_VERSION=2"
+    "-sFULL_ES3=1"
+    "-sALLOW_MEMORY_GROWTH=1"
+    "-sASSERTIONS=1"
+    "-sASYNCIFY"
+    "-sASYNCIFY_IMPORTS=['openFileDialog']"
+    "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"lengthBytesUTF8\",\"stringToUTF8\"]"
+  )
+  add_link_options(
+    "-sUSE_SDL=2"
+    "-sUSE_WEBGL2=1"
+    "-sMAX_WEBGL_VERSION=2"
+    "-sMIN_WEBGL_VERSION=2"
+    "-sFULL_ES3=1"
+    "-sALLOW_MEMORY_GROWTH=1"
+    "-sASSERTIONS=1"
+    "-sASYNCIFY"
+    "-sASYNCIFY_IMPORTS=['openFileDialog']"
+    "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"lengthBytesUTF8\",\"stringToUTF8\"]"
+  )
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os")
 else()
-    find_package(OpenGL REQUIRED)
-    find_package(SDL2 REQUIRED)
-    include_directories(${SDL2_INCLUDE_DIRS})
+  find_package(OpenGL REQUIRED)
+  find_package(SDL2 REQUIRED)
+  include_directories(${SDL2_INCLUDE_DIRS})
 endif()
 
 
