@@ -203,6 +203,31 @@ void AudioPlayer::flacToFloat(const char* filepath)
 
 void AudioPlayer::loadFile(const char* filepath)
 {
+    // clean up existing audio buffer
+    if (audioStartPtr != nullptr)
+    {
+        switch (audioFormat)
+        {
+            case AudioFormat::MP3:
+                drmp3_free(audioStartPtr, nullptr);
+                break;
+            case AudioFormat::WAV:
+                SDL_FreeWAV(audioStartPtr);
+                break;
+            case AudioFormat::FLAC:
+                drflac_free(audioStartPtr, NULL);
+                break;
+            default:
+                break;
+        }
+
+        audioStartPtr = nullptr;
+    }
+    else
+    {
+        // nothing, already cleared
+    }
+    
     // determine the file type base on the extension
     std::string filePathStr(filepath);
     std::string extension = filePathStr.substr(filePathStr.find_last_of('.') + 1);
