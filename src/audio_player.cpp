@@ -157,16 +157,9 @@ void AudioPlayer::mp3ToFloat(const char* filepath)
     // assign dr_mp3 data to AudioPlayer 
     this->audioSize = frameCount * config.channels * sizeof(float);
 
-// #ifdef __EMSCRIPTEN__
-//     // copy array into heap allocated array
-//     std::vector<float> mp3Buffer(frameCount * config.channels);
-//     memcpy(mp3Buffer.data(), pSampleData, audioSize);
-//     this->audioStartPtr = (Uint8*)&mp3Buffer[0];
-// #else
     // using the buffer for dr_mp3 directly
     // yeah, casting ptr, not the best, but I need the memory address
     this->audioStartPtr = (Uint8*)pSampleData;
-// #endif
     
     // we need the data later, no freeing pSampleData
     pSampleData = nullptr;
