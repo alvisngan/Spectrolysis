@@ -56,8 +56,10 @@ void guiInit(SDL_Window *window, SDL_GLContext gl_context, const char* version)
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(version);
 
+#ifndef __EMSCRIPTEN__
     // load fonts
     s_setUpFonts();
+#endif
 
     // set style
     guiThemeApplyColor();
