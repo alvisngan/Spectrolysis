@@ -13,15 +13,6 @@ endif()
 if(USING_EMSCRIPTEN)
   add_compile_options(
     "-sUSE_SDL=2"
-    "-sUSE_WEBGL2=1"
-    "-sMAX_WEBGL_VERSION=2"
-    "-sMIN_WEBGL_VERSION=2"
-    "-sFULL_ES3=1"
-    "-sALLOW_MEMORY_GROWTH=1"
-    "-sASSERTIONS=1"
-    "-sASYNCIFY"
-    "-sASYNCIFY_IMPORTS=['openFileDialog']"
-    "-sEXPORTED_RUNTIME_METHODS=[\"FS\",\"lengthBytesUTF8\",\"stringToUTF8\"]"
   )
   add_link_options(
     "-sUSE_SDL=2"
