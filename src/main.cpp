@@ -162,22 +162,9 @@ int main()
 {
     // Obtain the current WebGL context handle
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
-    if (ctx == 0) {
-        std::cerr << "Error: No current WebGL context found." << std::endl;
-        // Handle the error appropriately (e.g., exit or fallback)
-        return -1;
-    }
-
-    EMSCRIPTEN_RESULT res = emscripten_webgl_get_drawing_buffer_size(ctx, &g_screenWidth, &g_screenHeight);
-    if (res != EMSCRIPTEN_RESULT_SUCCESS) {
-        std::cerr << "Error: Failed to get drawing buffer size." << std::endl;
-        // Handle the error appropriately
-        return -1;
-    }
+    emscripten_webgl_get_drawing_buffer_size(ctx, &g_screenWidth, &g_screenHeight);
 
     SDL_SetWindowSize(window, g_screenWidth, g_screenHeight);
-
-    std::cout << "Canvas size: " << g_screenWidth << ", " << g_screenHeight << std::endl;
 }
 #endif
 
