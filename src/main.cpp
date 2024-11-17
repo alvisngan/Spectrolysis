@@ -5,7 +5,8 @@
 #include <memory>
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>
+#include <emscripten/emscripten.h>
+#include <emscripten/html5.h> 
 #endif
 
 #include <SDL2/SDL.h>
@@ -99,8 +100,8 @@ void checkRenderErrors(const char* errorLocation = "");
 bool g_done = false;
 
 // settings
-const int g_SCR_WIDTH = 1920;
-const int g_SCR_HEIGHT = 1080;
+int g_screenWidth = 1920;
+int g_screenHeight = 1080;
 guiColorPalette g_color; // used in gui_theme.cpp
 
 
@@ -137,8 +138,8 @@ int main()
     SDL_Window* window = SDL_CreateWindow("Spectrolysis", 
                                           SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED,
-                                          g_SCR_WIDTH, 
-                                          g_SCR_HEIGHT, 
+                                          g_screenWidth, 
+                                          g_screenHeight, 
                                           window_flags);
     if (window == NULL)
     {
@@ -156,7 +157,29 @@ int main()
         return -1;
     }
     SDL_GL_MakeCurrent(window, gl_context);
-    // SDL_GL_SetSwapInterval(1); // enable V-Sync
+
+#ifdef __EMSCRIPTEN__
+{
+    // Obtain the current WebGL context handle
+    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_get_current_context();
+    if (ctx == 0) {
+        std::cerr << "Error: No current WebGL context found." << std::endl;
+        // Handle the error appropriately (e.g., exit or fallback)
+        return -1;
+    }
+
+    EMSCRIPTEN_RESULT res = emscripten_webgl_get_drawing_buffer_size(ctx, &g_screenWidth, &g_screenHeight);
+    if (res != EMSCRIPTEN_RESULT_SUCCESS) {
+        std::cerr << "Error: Failed to get drawing buffer size." << std::endl;
+        // Handle the error appropriately
+        return -1;
+    }
+
+    SDL_SetWindowSize(window, g_screenWidth, g_screenHeight);
+
+    std::cout << "Canvas size: " << g_screenWidth << ", " << g_screenHeight << std::endl;
+}
+#endif
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -208,7 +231,7 @@ int main()
     // creating viewport
     // -----------------
     Camera camera;
-    FrameBuffer sceneBuffer(g_SCR_WIDTH, g_SCR_HEIGHT);
+    FrameBuffer sceneBuffer(g_screenWidth, g_screenHeight);
 
     // Audio Interface
     // ----------------
@@ -514,8 +537,8 @@ bool processInput(SDL_Window* window, Camera& camera)
             done = true;
         }
         else if (event.type == SDL_WINDOWEVENT 
-            && event.window.event == SDL_WINDOWEVENT_CLOSE 
-            && event.window.windowID == SDL_GetWindowID(window)
+                 && event.window.event == SDL_WINDOWEVENT_CLOSE 
+                 && event.window.windowID == SDL_GetWindowID(window)
         )
         {
             done = true;
