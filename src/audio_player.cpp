@@ -419,8 +419,8 @@ void AudioPlayer::setupDevice(const char* deviceName)
     // set the device for playback for 0, or '1' for recording.
     device = SDL_OpenAudioDevice(
         deviceName, 0, &audioSpec, nullptr, 
-        // disallow frequency change
-        SDL_AUDIO_ALLOW_FORMAT_CHANGE | SDL_AUDIO_ALLOW_CHANNELS_CHANGE
+        // disallow frequency change and channel change
+        SDL_AUDIO_ALLOW_FORMAT_CHANGE
     );  
 
     if (device == 0)
