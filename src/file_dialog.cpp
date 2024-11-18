@@ -15,16 +15,12 @@
 #endif
 
 #ifdef __EMSCRIPTEN__ 
-// const char* fileDialogGetAudioPath(){ return "";}
-
-// Javascript, GROSS!!!!!!!
-
-
 EM_JS(void, openFileDialog, (char* buffer, int bufferSize), {
     // JavaScript code:
     Asyncify.handleSleep(function(wakeUp) {
         var input = document.createElement('input');
         input.type = 'file';
+        input.accept = '.mp3, .wav, .flac, .MP3, .WAV, .FLAC';
 
         input.onchange = e => {
             // Get only the first file
@@ -43,7 +39,7 @@ EM_JS(void, openFileDialog, (char* buffer, int bufferSize), {
                 var filename = '/' + file.name;
                 FS.writeFile(filename, data);
 
-                // Includes the null terminator at the end
+                // includes the null terminator at the end
                 var lengthBytes = lengthBytesUTF8(filename) + 1;
                 if (lengthBytes > bufferSize) {
                     console.error('Filename too long for buffer');
