@@ -1,8 +1,10 @@
 #include "audio_player.hpp"
+#include "SDL_stdinc.h"
 
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <algorithm> // std::min
 
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_FLOAT_OUTPUT
@@ -26,24 +28,24 @@ AudioPlayer::AudioPlayer()//const char* filepath)
 
 AudioPlayer::~AudioPlayer()
 {
-    if (audioStartPtr != nullptr)
+    if (audioStartPtr.load() != nullptr)
     {
         switch (audioFormat)
         {
             case AudioFormat::MP3:
-                drmp3_free(audioStartPtr, nullptr);
+                drmp3_free(audioStartPtr.load(), nullptr);
                 break;
             case AudioFormat::WAV:
-                SDL_FreeWAV(audioStartPtr);
+                SDL_FreeWAV(audioStartPtr.load());
                 break;
             case AudioFormat::FLAC:
-                drflac_free(audioStartPtr, NULL);
+                drflac_free(audioStartPtr.load(), NULL);
                 break;
             default:
                 break;
         }
 
-        audioStartPtr = nullptr;
+        audioStartPtr.store(nullptr);
     }
     else
     {
@@ -60,7 +62,10 @@ AudioPlayer::~AudioPlayer()
 
 void AudioPlayer::wavToFloat(const char* filepath)
 {
-    if (SDL_LoadWAV(filepath, &audioSpec, &audioStartPtr, &audioSize) == nullptr)
+    Uint32 wavSize;
+    Uint8* wavStartPtr = nullptr;
+
+    if (SDL_LoadWAV(filepath, &audioSpec, &wavStartPtr, &wavSize) == nullptr)
     {
         std::cout << "Failed to load audio: " << SDL_GetError() << std::endl;
     }
@@ -68,6 +73,9 @@ void AudioPlayer::wavToFloat(const char* filepath)
     {
         // no need to callback now, we will callback after setting desired specs
     }
+
+    this->audioSize.store(wavSize);
+    this->audioStartPtr.store(wavStartPtr);
 
     // copying audioSpec to desiredSpec and change format to float
     SDL_AudioSpec desiredSpec;
@@ -92,7 +100,7 @@ void AudioPlayer::wavToFloat(const char* filepath)
     }
     else if (cvt.needed)
     {
-        cvt.len = audioSize;
+        cvt.len = audioSize.load();
         cvt.buf = (Uint8*)SDL_malloc(cvt.len * cvt.len_mult);
         
         // if cvt buffer allocation failed, i.e. nullptr
@@ -104,7 +112,7 @@ void AudioPlayer::wavToFloat(const char* filepath)
         else
         {
             // copy the original audio data into the converter buffer
-            memcpy(cvt.buf, audioStartPtr, audioSize);
+            memcpy(cvt.buf, audioStartPtr.load(), audioSize.load());
 
             // perform the conversion
             if (SDL_ConvertAudio(&cvt) < 0)
@@ -115,9 +123,9 @@ void AudioPlayer::wavToFloat(const char* filepath)
             else
             {
                 // replace audioStartPtr and audioSize with the converted data
-                SDL_FreeWAV(audioStartPtr); // free the original WAV data
-                audioStartPtr = cvt.buf;
-                audioSize = cvt.len_cvt;
+                SDL_FreeWAV(audioStartPtr.load()); // free the original WAV data
+                audioStartPtr.store(cvt.buf);
+                audioSize.store(cvt.len_cvt);
 
                 // update the audioSpec to the desired format
                 audioSpec = desiredSpec;
@@ -156,11 +164,11 @@ void AudioPlayer::mp3ToFloat(const char* filepath)
     audioSpec.userdata = this;
 
     // assign dr_mp3 data to AudioPlayer 
-    this->audioSize = frameCount * config.channels * sizeof(float);
+    this->audioSize.store(frameCount * config.channels * sizeof(float));
 
     // using the buffer for dr_mp3 directly
     // yeah, casting ptr, not the best, but I need the memory address
-    this->audioStartPtr = (Uint8*)pSampleData;
+    this->audioStartPtr.store((Uint8*)pSampleData);
     
     // we need the data later, no freeing pSampleData
     pSampleData = nullptr;
@@ -193,8 +201,8 @@ void AudioPlayer::flacToFloat(const char* filepath)
 
     // assign dr_flac data to AudioPlayer 
     // yeah, casting ptr, not the best, but I need the memory address
-    this->audioStartPtr = (Uint8*)pSampleData;
-    this->audioSize = totalPCMFrameCount * channels * sizeof(float);
+    this->audioStartPtr.store((Uint8*)pSampleData);
+    this->audioSize.store(totalPCMFrameCount * channels * sizeof(float));
 
     // we need the data later, no freeing pSampleData
     pSampleData = nullptr;
@@ -204,25 +212,27 @@ void AudioPlayer::flacToFloat(const char* filepath)
 
 void AudioPlayer::loadFile(const char* filepath)
 {
+    SDL_LockAudioDevice(device);
+
     // clean up existing audio buffer
-    if (audioStartPtr != nullptr)
+    if (audioStartPtr.load() != nullptr)
     {
         switch (audioFormat)
         {
             case AudioFormat::MP3:
-                drmp3_free(audioStartPtr, nullptr);
+                drmp3_free(audioStartPtr.load(), nullptr);
                 break;
             case AudioFormat::WAV:
-                SDL_FreeWAV(audioStartPtr);
+                SDL_FreeWAV(audioStartPtr.load());
                 break;
             case AudioFormat::FLAC:
-                drflac_free(audioStartPtr, NULL);
+                drflac_free(audioStartPtr.load(), NULL);
                 break;
             default:
                 break;
         }
 
-        audioStartPtr = nullptr;
+        audioStartPtr.store(nullptr);
     }
     else
     {
@@ -254,6 +264,9 @@ void AudioPlayer::loadFile(const char* filepath)
         return;
     }
 
+    SDL_UnlockAudioDevice(device);
+
+    // re-setup device since audioSpec has changed
     this->setupDevice();
 }
 
@@ -263,7 +276,6 @@ void AudioPlayer::play()
     // queue the audio (so we play when available,
     // as oppososed to a callback function)
     this->isPaused.store(false);
-    // int status = SDL_QueueAudio(device, audioStartPtr, audioSize);
     SDL_PauseAudioDevice(device, 0);    
 }
 
@@ -294,7 +306,7 @@ void AudioPlayer::setAudioPosition(Uint32 toTimeSec)
     Uint32 bytesPerSec = audioSpec.freq * audioSpec.channels * bytesPerSample;
 
     // clamp
-    this->audioBytePos.store(std::min(toTimeSec * bytesPerSec, audioSize));
+    this->audioBytePos.store(std::min(toTimeSec * bytesPerSec, audioSize.load()));
 }
 
 
@@ -359,7 +371,7 @@ void AudioPlayer::getAudioData(float* buffer, int numSamples)
             Uint32 bufferStartPosition = currentBytePos - bufferSize;
 
             // pointer to the data start point
-            Uint8* dataPtr = audioStartPtr + bufferStartPosition;
+            Uint8* dataPtr = audioStartPtr.load() + bufferStartPosition;
 
             // copy audio stream data to the buffer
             // (already converted to float in constructor)
@@ -434,28 +446,41 @@ void AudioPlayer::setupDevice(const char* deviceName)
 void audioPlayerAudioCallback(void* userdata, Uint8* stream, 
                               int callbackBufferSize)
 {
-    // written by ChatGPT o1-preview
     // need a callback to keep track of audioBytePos
 
     AudioPlayer* audioPlayer = static_cast<AudioPlayer*>(userdata);
 
-    if (audioPlayer->isPaused.load())
+    Uint32 currentSize = audioPlayer->audioSize.load();
+    Uint8* currentStartPtr = audioPlayer->audioStartPtr.load();
+    Uint32 currentBytePos = audioPlayer->audioBytePos.load(std::memory_order_relaxed);
+    
+    if (audioPlayer->isPaused.load() || 
+        currentStartPtr == nullptr || 
+        currentSize == 0)
     {
-        // Fill the stream with silence if paused
+        // fill the stream with silence if paused
         SDL_memset(stream, 0, callbackBufferSize);
         return;
     }
 
-    Uint32 currentBytePos = audioPlayer->audioBytePos.load(std::memory_order_relaxed);
+    // pause the audio when finish playback
+    if (currentBytePos >= currentSize)
+    {
+        
+        audioPlayer->isPaused.store(true);
+        SDL_PauseAudioDevice(audioPlayer->device, 1);
+        SDL_memset(stream, 0, callbackBufferSize);
+        return;
+    }
 
-    Uint32 remaining = audioPlayer->audioSize - currentBytePos;
+    Uint32 remaining = currentSize - currentBytePos;
     Uint32 toCopy = (callbackBufferSize > static_cast<int>(remaining)) ? remaining : callbackBufferSize;
 
     if (toCopy > 0)
     {
         // Copy audio data from audioStartPtr to the stream
         SDL_memcpy(stream, 
-                   audioPlayer->audioStartPtr + currentBytePos, 
+                   currentStartPtr + currentBytePos, 
                    toCopy);
         audioPlayer->audioBytePos.fetch_add(toCopy, std::memory_order_relaxed);
     }
@@ -464,14 +489,5 @@ void audioPlayerAudioCallback(void* userdata, Uint8* stream,
     {
         // Fill the rest of the stream with silence (if we've reached the end)
         SDL_memset(stream + toCopy, 0, callbackBufferSize - toCopy);
-    }
-
-    // If we've reached the end of the audio, stop playback
-    if (currentBytePos >= audioPlayer->audioSize)
-    {
-        // Optionally, you can loop or reset the position
-        // For now, we'll pause the audio
-        audioPlayer->isPaused.store(true);
-        SDL_PauseAudioDevice(audioPlayer->device, 1);
     }
 }

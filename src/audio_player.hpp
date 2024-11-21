@@ -112,8 +112,8 @@ private:
     
     // .WAV file properties
     SDL_AudioSpec audioSpec;
-    Uint8* audioStartPtr;   // pointer to audio stream
-    Uint32 audioSize;       // total size of audio stream in bytes
+    std::atomic<Uint8*> audioStartPtr;   // pointer to audio stream
+    std::atomic_uint32_t audioSize;       // total size of audio stream in bytes
     std::atomic_uint32_t audioBytePos;
    
     int numDevices;         
