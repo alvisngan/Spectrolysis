@@ -15,6 +15,12 @@
 #endif
 
 #ifdef __EMSCRIPTEN__ 
+/// BUG:    loading a file right after another can cause index out of bound 
+///         exception in Firefox, due to async problem
+///
+/// BUG:    exiting file dialog without loading any file causes black screen
+///         due to this function not properly returning null pointer
+///
 EM_JS(void, openFileDialog, (char* buffer, int bufferSize), {
     // JavaScript code:
     Asyncify.handleSleep(function(wakeUp) {
